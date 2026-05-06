@@ -964,13 +964,21 @@ function destroyStripeCardElement() {
     stripeInstance.value = null;
 }
 
+function paypalSdkCurrency() {
+    // PayPal Advanced Card Fields suporta apenas moedas internacionais (USD, EUR, GBP, AUD, CAD).
+    // Se displayCurrency for BRL ou ausente, força USD (default seguro p/ produtos internacionais).
+    const c = (props.displayCurrency || '').toUpperCase();
+    if (c === 'EUR') return 'EUR';
+    return 'USD';
+}
+
 async function initPayPalCardFields() {
     if (!cardPayPalClientId.value || !paypalCardNumberRef.value) return;
     try {
         paypalLoading.value = true;
         paypalError.value = '';
         const { loadScript } = await import('@paypal/paypal-js');
-        const currency = (props.displayCurrency || 'USD').toUpperCase();
+        const currency = paypalSdkCurrency();
         const paypal = await loadScript({
             'client-id': cardPayPalClientId.value,
             components: 'card-fields',
@@ -986,6 +994,7 @@ async function initPayPalCardFields() {
             createOrder: async () => {
                 const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
                 const amount = props.checkoutTotal || props.checkoutTotalBrl || 0;
+                const currency = paypalSdkCurrency();
                 const r = await fetch('/checkout/paypal/create-order', {
                     method: 'POST',
                     headers: {
