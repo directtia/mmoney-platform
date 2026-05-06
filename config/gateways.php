@@ -8,59 +8,6 @@ return [
     |--------------------------------------------------------------------------
     */
     'gateways' => [
-        'cajupay' => [
-            'slug' => 'cajupay',
-            'name' => 'CajuPay',
-            'image' => 'images/gateways/cajupay.png',
-            'methods' => ['pix'],
-            'scope' => 'national',
-            'country' => 'br',
-            'country_name' => 'Brasil',
-            'country_flag' => 'brasil.png',
-            'signup_url' => 'https://cajupay.com.br',
-            'driver' => \App\Gateways\CajuPay\CajuPayDriver::class,
-            'credential_keys' => [
-                ['key' => 'public_key', 'label' => 'Chave pública', 'type' => 'text'],
-                ['key' => 'secret_key', 'label' => 'Chave secreta', 'type' => 'password'],
-            ],
-        ],
-        'spacepag' => [
-            'slug' => 'spacepag',
-            'name' => 'Spacepag',
-            'image' => 'images/gateways/spacepag2.png',
-            'methods' => ['pix'],
-            'scope' => 'national',
-            'country' => 'br',
-            'country_name' => 'Brasil',
-            'country_flag' => 'brasil.png',
-            'signup_url' => 'https://hub.spacepag.com.br/auth/jwt/sign-up?ref=4a5d0212320748719ee818cffdb93248',
-            'driver' => \App\Gateways\Spacepag\SpacepagDriver::class,
-            'credential_keys' => [
-                ['key' => 'public_key', 'label' => 'Chave pública', 'type' => 'text'],
-                ['key' => 'secret_key', 'label' => 'Chave secreta', 'type' => 'password'],
-            ],
-        ],
-        'efi' => [
-            'slug' => 'efi',
-            'name' => 'Efí',
-            'image' => 'images/gateways/efi.png',
-            'methods' => ['pix', 'card', 'boleto', 'pix_auto'],
-            'scope' => 'national',
-            'country' => 'br',
-            'country_name' => 'Brasil',
-            'country_flag' => 'brasil.png',
-            'signup_url' => 'https://sejaefi.com.br',
-            'driver' => \App\Gateways\Efi\EfiDriver::class,
-            'certificate_key' => 'certificate',
-            'credential_keys' => [
-                ['key' => 'client_id', 'label' => 'Client ID', 'type' => 'text'],
-                ['key' => 'client_secret', 'label' => 'Client Secret', 'type' => 'password'],
-                ['key' => 'pix_key', 'label' => 'Chave PIX (E‑mail, CPF, CNPJ ou aleatória)', 'type' => 'text'],
-                ['key' => 'payee_code', 'label' => 'Identificador de conta (payee_code) — para cartão', 'type' => 'text'],
-                ['key' => 'sandbox', 'label' => 'Usar ambiente de homologação (sandbox)', 'type' => 'boolean'],
-                ['key' => 'certificate', 'label' => 'Certificado P12', 'type' => 'file'],
-            ],
-        ],
         'stripe' => [
             'slug' => 'stripe',
             'name' => 'Stripe',
@@ -105,22 +52,6 @@ return [
                 ['key' => 'sandbox', 'label' => 'Usar sandbox (credenciais de teste)', 'type' => 'boolean'],
             ],
         ],
-        'pushinpay' => [
-            'slug' => 'pushinpay',
-            'name' => 'Pushin Pay',
-            'image' => 'images/gateways/pushinpay.png',
-            'methods' => ['pix', 'pix_auto'],
-            'scope' => 'national',
-            'country' => 'br',
-            'country_name' => 'Brasil',
-            'country_flag' => 'brasil.png',
-            'signup_url' => 'https://app.pushinpay.com.br/register',
-            'driver' => \App\Gateways\PushinPay\PushinPayDriver::class,
-            'credential_keys' => [
-                ['key' => 'api_token', 'label' => 'API Token', 'type' => 'password'],
-                ['key' => 'sandbox', 'label' => 'Usar ambiente de homologação (sandbox)', 'type' => 'boolean'],
-            ],
-        ],
         'asaas' => [
             'slug' => 'asaas',
             'name' => 'Asaas',
@@ -163,10 +94,10 @@ return [
     |--------------------------------------------------------------------------
     */
     'default_order' => [
-        'pix' => ['cajupay', 'spacepag', 'efi', 'mercadopago', 'pagarme', 'pushinpay', 'asaas'],
-        'card' => ['efi', 'stripe', 'mercadopago', 'pagarme', 'asaas'],
-        'boleto' => ['efi', 'mercadopago', 'pagarme', 'asaas'],
-        'pix_auto' => ['efi', 'pushinpay'],
+        'pix' => ['mercadopago', 'pagarme', 'asaas'],
+        'card' => ['stripe', 'mercadopago', 'pagarme', 'asaas'],
+        'boleto' => ['mercadopago', 'pagarme', 'asaas'],
+        'pix_auto' => [],
         'crypto' => [],
     ],
 ];
