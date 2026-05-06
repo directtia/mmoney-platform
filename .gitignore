@@ -30,3 +30,6 @@ Thumbs.db
 /Docs Gateways
 docs
 Docs Gateways
+# Runtime data and backups (host-side)
+.docker/
+docker-compose.yml.bak
