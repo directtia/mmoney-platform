@@ -1,0 +1,12 @@
+{
+    "slug": "paypal",
+    "name": "PayPal",
+    "version": "1.0.0",
+    "description": "Gateway PayPal — pagamentos internacionais via Advanced Card Fields. Suporta cartão de crédito em USD/EUR/GBP/etc.",
+    "author": "directtia",
+    "type": "gateway",
+    "category": "gateway",
+    "menu": [],
+    "routes": null,
+    "migrations": null
+}
