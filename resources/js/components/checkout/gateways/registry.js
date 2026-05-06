@@ -27,6 +27,9 @@ export const gatewayMethodComponents = {
         pix: DefaultMethodCard,
         boleto: DefaultMethodCard,
     },
+    paypal: {
+        card: DefaultMethodCard,
+    },
     mercadopago: {
         pix: MercadopagoPix,
         card: MercadopagoCard,

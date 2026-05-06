@@ -167,6 +167,15 @@ const isCardGatewayEfi = computed(() => cardGatewaySlug.value === 'efi');
 const isCardGatewayMercadopago = computed(() => cardGatewaySlug.value === 'mercadopago');
 const isCardGatewayAsaas = computed(() => cardGatewaySlug.value === 'asaas');
 const isCardGatewayPagarme = computed(() => cardGatewaySlug.value === 'pagarme');
+const isCardGatewayPayPal = computed(() => cardGatewaySlug.value === 'paypal');
+const cardPayPalClientId = computed(() => {
+    const k = props.cardGatewayKeys?.paypal;
+    return (k && typeof k.client_id === 'string' ? k.client_id : '').trim();
+});
+const cardPayPalSandbox = computed(() => {
+    const k = props.cardGatewayKeys?.paypal;
+    return !!(k && k.sandbox);
+});
 /** Gateway do boleto (primeiro método com id === 'boleto' em available_payment_methods). */
 const boletoGatewaySlug = computed(() => {
     const methods = Array.isArray(props.availablePaymentMethods) ? props.availablePaymentMethods : [];
@@ -750,6 +759,15 @@ const stripeInstance = ref(null);
 const stripeCardElement = ref(null);
 const stripeElements = ref(null);
 
+// PayPal Hosted Card Fields (quando gateway cartão é PayPal)
+const paypalCardNumberRef = ref(null);
+const paypalCardExpiryRef = ref(null);
+const paypalCardCvvRef = ref(null);
+const paypalCardFields = ref(null);
+const paypalLastOrderID = ref(null);
+const paypalLoading = ref(false);
+const paypalError = ref('');
+
 // Mercado Pago Card Payment Brick (cartão)
 const mercadopagoBrickContainer = ref(null);
 const mercadopagoBrickController = ref(null);
@@ -858,6 +876,19 @@ watch(
 );
 
 watch(
+    () => [form.payment_method, isCardGatewayPayPal.value, cardPayPalClientId.value],
+    async ([method, isPP]) => {
+        if (method !== 'card' || !isPP) {
+            destroyPayPalCardFields();
+            return;
+        }
+        await nextTick();
+        initPayPalCardFields();
+    },
+    { immediate: true }
+);
+
+watch(
     () => [form.payment_method, isCardGatewayMercadopago.value, props.cardMercadopagoPublicKey, props.checkoutTotalBrl],
     async ([method, isMP]) => {
         if (method !== 'card' || !isMP) {
@@ -931,6 +962,102 @@ function destroyStripeCardElement() {
     }
     stripeElements.value = null;
     stripeInstance.value = null;
+}
+
+async function initPayPalCardFields() {
+    if (!cardPayPalClientId.value || !paypalCardNumberRef.value) return;
+    try {
+        paypalLoading.value = true;
+        paypalError.value = '';
+        const { loadScript } = await import('@paypal/paypal-js');
+        const currency = (props.displayCurrency || 'USD').toUpperCase();
+        const paypal = await loadScript({
+            'client-id': cardPayPalClientId.value,
+            components: 'card-fields',
+            currency,
+            'enable-funding': 'card',
+            'disable-funding': 'paypal,credit',
+        });
+        if (!paypal?.CardFields) {
+            paypalError.value = 'PayPal SDK não disponível.';
+            return;
+        }
+        const cardFields = paypal.CardFields({
+            createOrder: async () => {
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                const amount = props.checkoutTotal || props.checkoutTotalBrl || 0;
+                const r = await fetch('/checkout/paypal/create-order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        product_id: form.product_id,
+                        amount,
+                        currency,
+                    }),
+                });
+                if (!r.ok) {
+                    const err = await r.json().catch(() => ({}));
+                    throw new Error(err.message || 'Falha ao iniciar pagamento PayPal.');
+                }
+                const data = await r.json();
+                if (!data.orderID) throw new Error('PayPal não retornou order_id.');
+                return data.orderID;
+            },
+            onApprove: ({ orderID }) => {
+                paypalLastOrderID.value = orderID;
+            },
+            onError: (err) => {
+                paypalError.value = (err && err.message) || 'Erro no formulário PayPal.';
+            },
+        });
+        if (typeof cardFields.isEligible === 'function' && !cardFields.isEligible()) {
+            paypalError.value = 'PayPal indisponível pra esta moeda/região.';
+            return;
+        }
+        cardFields.NumberField().render(paypalCardNumberRef.value);
+        cardFields.ExpiryField().render(paypalCardExpiryRef.value);
+        cardFields.CVVField().render(paypalCardCvvRef.value);
+        paypalCardFields.value = cardFields;
+    } catch (e) {
+        paypalError.value = (e && e.message) || 'Falha ao carregar PayPal.';
+        console.warn('PayPal init failed', e);
+    } finally {
+        paypalLoading.value = false;
+    }
+}
+
+function destroyPayPalCardFields() {
+    paypalCardFields.value = null;
+    paypalLastOrderID.value = null;
+    paypalError.value = '';
+}
+
+async function getPayPalCardToken() {
+    if (!paypalCardFields.value) {
+        throw new Error('PayPal não está pronto. Recarregue a página.');
+    }
+    paypalLastOrderID.value = null;
+    try {
+        await paypalCardFields.value.submit();
+    } catch (e) {
+        throw new Error((e && e.message) || 'Não foi possível validar o cartão. Verifique os dados.');
+    }
+    let attempts = 0;
+    while (!paypalLastOrderID.value && attempts < 50) {
+        await new Promise((r) => setTimeout(r, 200));
+        attempts++;
+    }
+    if (!paypalLastOrderID.value) {
+        const errMsg = paypalError.value || 'Não foi possível validar o cartão. Tente novamente.';
+        throw new Error(errMsg);
+    }
+    return { payment_token: paypalLastOrderID.value, card_mask: '' };
 }
 
 function destroyMercadopagoBrick() {
@@ -1379,7 +1506,16 @@ function submit() {
             cardFormError.value = props.t('checkout.use_mercadopago_below') || 'Use o botão de pagamento do Mercado Pago abaixo.';
             return;
         }
-        if (isCardGatewayStripe.value) {
+        if (isCardGatewayPayPal.value) {
+            if (!cardPayPalClientId.value) {
+                cardFormError.value = props.t('checkout.card_not_configured') || 'Pagamento por cartão não está configurado.';
+                return;
+            }
+            if (!paypalCardFields.value) {
+                cardFormError.value = paypalError.value || 'Aguarde o formulário do cartão carregar.';
+                return;
+            }
+        } else if (isCardGatewayStripe.value) {
             if (!props.cardStripePublishableKey || !props.cardStripePublishableKey.trim()) {
                 cardFormError.value = props.t('checkout.card_not_configured') || 'Pagamento por cartão não está configurado.';
                 return;
@@ -1445,11 +1581,13 @@ function submit() {
         }
         cardTokenizing.value = true;
         cardFormError.value = '';
-        const getTokenPromise = isCardGatewayStripe.value
-            ? getStripePaymentMethod()
-            : isCardGatewayPagarme.value
-                ? getPagarmePaymentToken()
-                : getEfiPaymentToken();
+        const getTokenPromise = isCardGatewayPayPal.value
+            ? getPayPalCardToken()
+            : isCardGatewayStripe.value
+                ? getStripePaymentMethod()
+                : isCardGatewayPagarme.value
+                    ? getPagarmePaymentToken()
+                    : getEfiPaymentToken();
         getTokenPromise
             .then(({ payment_token, card_mask }) => {
                 const payload = {
@@ -1987,6 +2125,27 @@ function submit() {
                         @update:step="asaasCardStep = $event"
                     />
                 </div>
+                <!-- PayPal: Hosted Card Fields (cartão renderizado em iframes da PayPal, sem PCI scope no nosso server) -->
+                <template v-else-if="isCardGatewayPayPal">
+                    <div v-if="paypalLoading" class="sm:col-span-2 rounded-xl border-2 border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                        Carregando formulário PayPal...
+                    </div>
+                    <div v-if="paypalError" class="sm:col-span-2 rounded-xl border-2 border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {{ paypalError }}
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="mb-2 block text-sm font-medium text-gray-700">Número do cartão</label>
+                        <div ref="paypalCardNumberRef" class="paypal-card-field rounded-xl border-2 border-gray-100 bg-white px-4 min-h-[3.25rem]"></div>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700">Validade</label>
+                        <div ref="paypalCardExpiryRef" class="paypal-card-field rounded-xl border-2 border-gray-100 bg-white px-4 min-h-[3.25rem]"></div>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700">CVV</label>
+                        <div ref="paypalCardCvvRef" class="paypal-card-field rounded-xl border-2 border-gray-100 bg-white px-4 min-h-[3.25rem]"></div>
+                    </div>
+                </template>
                 <!-- Stripe: Card Element (dados do cartão não passam pelo nosso servidor) -->
                 <template v-else-if="isCardGatewayStripe">
                     <div class="relative sm:col-span-2">
@@ -2228,7 +2387,7 @@ function submit() {
                 </div>
                 <!-- Parcelas (Efí e Asaas; Stripe e MP Brick têm seu próprio) -->
                 <div
-                    v-if="form.payment_method === 'card' && cardInstallmentsEnabled && !isCardGatewayStripe && !isCardGatewayMercadopago && !isCardGatewayAsaas"
+                    v-if="form.payment_method === 'card' && cardInstallmentsEnabled && !isCardGatewayStripe && !isCardGatewayMercadopago && !isCardGatewayAsaas && !isCardGatewayPayPal"
                     class="mt-4"
                     data-checkout="form-installments"
                 >
