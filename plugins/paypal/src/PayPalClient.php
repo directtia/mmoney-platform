@@ -139,7 +139,11 @@ class PayPalClient
         $response = Http::withToken($this->token())
             ->acceptJson()
             ->timeout(30)
-            ->withHeaders(['PayPal-Request-Id' => 'capture-' . $orderId])
+            ->withHeaders([
+                'PayPal-Request-Id' => 'capture-' . $orderId,
+                'Content-Type' => 'application/json',
+            ])
+            ->withBody('{}', 'application/json')
             ->post($this->baseUrl() . '/v2/checkout/orders/' . $orderId . '/capture');
 
         if (! $response->successful()) {
