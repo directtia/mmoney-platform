@@ -984,7 +984,7 @@ async function initPayPalCardFields() {
             components: 'card-fields',
             currency,
             'enable-funding': 'card',
-            'disable-funding': 'paypal,credit',
+            'disable-funding': 'credit',
         });
         if (!paypal?.CardFields) {
             paypalError.value = 'PayPal SDK não disponível.';
