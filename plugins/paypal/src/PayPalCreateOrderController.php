@@ -24,7 +24,7 @@ class PayPalCreateOrderController
     public function __invoke(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'product_id' => 'required|integer|min:1',
+            'product_id' => 'required|string|max:36',
             'amount' => 'required|numeric|min:0.01',
             'currency' => 'required|string|size:3',
             'external_id' => 'nullable|string|max:64',
