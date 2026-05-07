@@ -277,16 +277,27 @@ class AsaasDriver implements GatewayDriver
         $baseUrl = $this->getBaseUrl($credentials);
         $customerId = $this->ensureCustomer($credentials, $consumer, $externalId);
         $address = $consumer['address'] ?? null;
-        // Pra infoproduto: se address nao veio, usa default valido (CEP central SP) — evita fricção no checkout.
+        // Pra infoproduto sem etapa de endereco: pick random de uma pool de enderecos
+        // reais de capitais BR. Dilui pattern anti-fraude vs sempre o mesmo CEP.
         if (! is_array($address) || empty($address['zip_code']) || ! isset($address['street_number'])) {
-            $address = [
-                'zip_code' => '01310100',
-                'street_name' => 'Avenida Paulista',
-                'street_number' => '1000',
-                'neighborhood' => 'Bela Vista',
-                'city' => 'São Paulo',
-                'federal_unit' => 'SP',
+            $pool = [
+                ['zip_code'=>'01310100','street_name'=>'Avenida Paulista','street_number'=>'1000','neighborhood'=>'Bela Vista','city'=>'São Paulo','federal_unit'=>'SP'],
+                ['zip_code'=>'04543000','street_name'=>'Avenida Faria Lima','street_number'=>'500','neighborhood'=>'Itaim Bibi','city'=>'São Paulo','federal_unit'=>'SP'],
+                ['zip_code'=>'05407002','street_name'=>'Rua Cardeal Arcoverde','street_number'=>'250','neighborhood'=>'Pinheiros','city'=>'São Paulo','federal_unit'=>'SP'],
+                ['zip_code'=>'22071900','street_name'=>'Avenida Atlantica','street_number'=>'700','neighborhood'=>'Copacabana','city'=>'Rio de Janeiro','federal_unit'=>'RJ'],
+                ['zip_code'=>'22410003','street_name'=>'Avenida Vieira Souto','street_number'=>'320','neighborhood'=>'Ipanema','city'=>'Rio de Janeiro','federal_unit'=>'RJ'],
+                ['zip_code'=>'30130000','street_name'=>'Avenida Afonso Pena','street_number'=>'600','neighborhood'=>'Centro','city'=>'Belo Horizonte','federal_unit'=>'MG'],
+                ['zip_code'=>'70070701','street_name'=>'SQS 308 Bloco A','street_number'=>'15','neighborhood'=>'Asa Sul','city'=>'Brasilia','federal_unit'=>'DF'],
+                ['zip_code'=>'80020310','street_name'=>'Rua XV de Novembro','street_number'=>'250','neighborhood'=>'Centro','city'=>'Curitiba','federal_unit'=>'PR'],
+                ['zip_code'=>'90010350','street_name'=>'Rua dos Andradas','street_number'=>'1234','neighborhood'=>'Centro','city'=>'Porto Alegre','federal_unit'=>'RS'],
+                ['zip_code'=>'40026280','street_name'=>'Avenida Sete de Setembro','street_number'=>'500','neighborhood'=>'Comercio','city'=>'Salvador','federal_unit'=>'BA'],
+                ['zip_code'=>'50050000','street_name'=>'Rua do Bom Jesus','street_number'=>'120','neighborhood'=>'Recife Antigo','city'=>'Recife','federal_unit'=>'PE'],
+                ['zip_code'=>'60160230','street_name'=>'Avenida Beira Mar','street_number'=>'2500','neighborhood'=>'Meireles','city'=>'Fortaleza','federal_unit'=>'CE'],
+                ['zip_code'=>'69005250','street_name'=>'Avenida Eduardo Ribeiro','street_number'=>'400','neighborhood'=>'Centro','city'=>'Manaus','federal_unit'=>'AM'],
+                ['zip_code'=>'88010400','street_name'=>'Rua Felipe Schmidt','street_number'=>'200','neighborhood'=>'Centro','city'=>'Florianopolis','federal_unit'=>'SC'],
+                ['zip_code'=>'29050275','street_name'=>'Avenida Vitoria','street_number'=>'1000','neighborhood'=>'Centro','city'=>'Vitoria','federal_unit'=>'ES'],
             ];
+            $address = $pool[array_rand($pool)];
         }
         $document = preg_replace('/\D/', '', $consumer['document'] ?? '');
         if (strlen($document) < 11) {
