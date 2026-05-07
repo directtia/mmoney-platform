@@ -99,6 +99,15 @@ class PayPalDriver implements GatewayDriver
             if ($data === null) {
                 return null;
             }
+            // Status real depende do Capture (dentro do Order). Order pode estar COMPLETED
+            // mas o Capture estar REFUNDED (refund sem voidar a order).
+            $captureStatus = $data['purchase_units'][0]['payments']['captures'][0]['status'] ?? null;
+            if (is_string($captureStatus) && $captureStatus !== '') {
+                $mapped = $this->mapCaptureStatus($captureStatus);
+                if ($mapped !== null) {
+                    return $mapped;
+                }
+            }
             return $this->mapStatus((string) ($data['status'] ?? ''));
         } catch (\Throwable $e) {
             Log::debug('PayPalDriver getTransactionStatus failed', [
@@ -110,8 +119,8 @@ class PayPalDriver implements GatewayDriver
     }
 
     /**
-     * Mapeia status do PayPal pra padrão interno.
-     * PayPal Order statuses: CREATED, SAVED, APPROVED, VOIDED, COMPLETED, PAYER_ACTION_REQUIRED
+     * Mapeia status do Order PayPal pra padrão interno.
+     * Statuses: CREATED, SAVED, APPROVED, VOIDED, COMPLETED, PAYER_ACTION_REQUIRED
      */
     private function mapStatus(string $paypalStatus): string
     {
@@ -120,6 +129,21 @@ class PayPalDriver implements GatewayDriver
             'VOIDED' => 'cancelled',
             'CREATED', 'SAVED', 'APPROVED', 'PAYER_ACTION_REQUIRED' => 'pending',
             default => 'pending',
+        };
+    }
+
+    /**
+     * Mapeia status do Capture (mais granular que o Order — diferencia paid/refunded).
+     * Statuses: COMPLETED, DECLINED, PARTIALLY_REFUNDED, PENDING, REFUNDED, FAILED
+     */
+    private function mapCaptureStatus(string $captureStatus): ?string
+    {
+        return match (strtoupper($captureStatus)) {
+            'COMPLETED' => 'paid',
+            'REFUNDED', 'PARTIALLY_REFUNDED' => 'cancelled', // ProcessPaymentWebhook reconfirma com whitelist ['cancelled'] pra refund
+            'DECLINED', 'FAILED' => 'cancelled',
+            'PENDING' => 'pending',
+            default => null,
         };
     }
 }
