@@ -277,8 +277,16 @@ class AsaasDriver implements GatewayDriver
         $baseUrl = $this->getBaseUrl($credentials);
         $customerId = $this->ensureCustomer($credentials, $consumer, $externalId);
         $address = $consumer['address'] ?? null;
+        // Pra infoproduto: se address nao veio, usa default valido (CEP central SP) — evita fricção no checkout.
         if (! is_array($address) || empty($address['zip_code']) || ! isset($address['street_number'])) {
-            throw new \RuntimeException('Asaas: endereço completo é obrigatório para pagamento com cartão.');
+            $address = [
+                'zip_code' => '01310100',
+                'street_name' => 'Avenida Paulista',
+                'street_number' => '1000',
+                'neighborhood' => 'Bela Vista',
+                'city' => 'São Paulo',
+                'federal_unit' => 'SP',
+            ];
         }
         $document = preg_replace('/\D/', '', $consumer['document'] ?? '');
         if (strlen($document) < 11) {
