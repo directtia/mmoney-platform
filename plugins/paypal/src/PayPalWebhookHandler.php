@@ -124,22 +124,23 @@ class PayPalWebhookHandler
             return response()->json(['message' => 'Invalid signature'], 400);
         }
 
-        // Mapear evento → status e despachar.
-        $statusMap = [
-            'PAYMENT.CAPTURE.COMPLETED' => 'paid',
-            'PAYMENT.CAPTURE.DENIED' => 'failed',
-            'PAYMENT.CAPTURE.REFUNDED' => 'refunded',
-            'PAYMENT.CAPTURE.REVERSED' => 'refunded',
-            'CHECKOUT.ORDER.APPROVED' => 'pending',
-            'CHECKOUT.ORDER.COMPLETED' => 'paid',
+        // ProcessPaymentWebhook espera nomes genéricos (order.paid, payment.refunded, order.cancelled).
+        // Mapeamos os PayPal nativos pra esses nomes pra job acionar a branch correta.
+        $eventMap = [
+            'PAYMENT.CAPTURE.COMPLETED' => ['order.paid', 'paid'],
+            'CHECKOUT.ORDER.COMPLETED' => ['order.paid', 'paid'],
+            'PAYMENT.CAPTURE.DENIED' => ['order.cancelled', 'cancelled'],
+            'PAYMENT.CAPTURE.REFUNDED' => ['payment.refunded', 'refunded'],
+            'PAYMENT.CAPTURE.REVERSED' => ['payment.refunded', 'refunded'],
+            'CHECKOUT.ORDER.APPROVED' => null, // pending — não dispara processamento
         ];
 
-        $newStatus = $statusMap[$eventType] ?? null;
-        if ($newStatus === null) {
+        if (! isset($eventMap[$eventType]) || $eventMap[$eventType] === null) {
             return response()->json(['received' => true]);
         }
 
-        ProcessPaymentWebhook::dispatchSync('paypal', $paypalOrderId, $eventType, $newStatus, $event);
+        [$normalizedEvent, $newStatus] = $eventMap[$eventType];
+        ProcessPaymentWebhook::dispatchSync('paypal', $paypalOrderId, $normalizedEvent, $newStatus, $event);
 
         return response()->json(['received' => true]);
     }
