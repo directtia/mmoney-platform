@@ -1432,27 +1432,14 @@ function submit() {
     if (paymentMethod === 'card') {
         cardFormError.value = '';
         if (isCardGatewayAsaas.value) {
-            if (asaasCardStep.value === 1) {
-                asaasCardStep.value = 2;
-                return;
-            }
+            // Asaas pra infoproduto: pula etapa de endereço (driver trata como opcional).
             const card = asaasCardData.value;
-            const addr = asaasAddressData.value;
             const nameOk = (card?.card_holder_name || '').trim().length >= 3;
             const numberOk = (card?.card_number || '').replace(/\D/g, '').length >= 13;
             const expOk = (card?.card_expiry_month || '').length === 2 && (card?.card_expiry_year || '').length >= 2;
             const cvvOk = (card?.card_ccv || '').length >= 3;
-            const zipOk = (addr?.address_zipcode || '').replace(/\D/g, '').length >= 8;
-            const streetOk = (addr?.address_street || '').trim().length >= 2;
-            const numOk = (addr?.address_number || '').trim().length >= 1;
-            const cityOk = (addr?.address_city || '').trim().length >= 2;
-            const stateOk = (addr?.address_state || '').trim().length === 2;
             if (!nameOk || !numberOk || !expOk || !cvvOk) {
                 cardFormError.value = props.t('checkout.card_fill_all') || 'Preencha todos os dados do cartão.';
-                return;
-            }
-            if (!zipOk || !streetOk || !numOk || !cityOk || !stateOk) {
-                cardFormError.value = 'Preencha o endereço completo (CEP, rua, número, cidade e UF).';
                 return;
             }
             cardTokenizing.value = true;
@@ -1471,12 +1458,6 @@ function submit() {
                 card_expiry_year: (card?.card_expiry_year || '').replace(/\D/g, '').slice(-4),
                 card_ccv: (card?.card_ccv || '').replace(/\D/g, ''),
                 installments: Math.min(props.cardMaxInstallments || 1, Math.max(1, card?.installments || 1)),
-                address_zipcode: (addr?.address_zipcode || '').replace(/\D/g, ''),
-                address_street: (addr?.address_street || '').trim(),
-                address_number: (addr?.address_number || '').trim(),
-                address_neighborhood: (addr?.address_neighborhood || '').trim(),
-                address_city: (addr?.address_city || '').trim(),
-                address_state: (addr?.address_state || '').trim().slice(0, 2).toUpperCase(),
             };
             if (props.productOfferId) payload.product_offer_id = props.productOfferId;
             if (props.subscriptionPlanId) payload.subscription_plan_id = props.subscriptionPlanId;
@@ -2566,7 +2547,7 @@ function submit() {
                             : form.payment_method === 'pix_auto'
                               ? (t('checkout.gerar_pix_auto') || 'Gerar PIX (renovação automática)')
                               : form.payment_method === 'card'
-                                ? (isCardGatewayAsaas && asaasCardStep === 1 ? 'Continuar' : (t('checkout.pagar_cartao') || 'Pagar com cartão'))
+                                ? (t('checkout.pagar_cartao') || 'Pagar com cartão')
                                 : form.payment_method === 'boleto'
                                   ? (t('checkout.gerar_boleto') || 'Gerar boleto')
                                   : t('checkout.submit_button')

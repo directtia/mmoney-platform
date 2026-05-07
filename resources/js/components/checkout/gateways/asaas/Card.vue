@@ -175,7 +175,8 @@ const inputClass = 'block w-full rounded-xl border-2 border-gray-100 bg-gray-50/
 const inputClassWithIcon = inputClass;
 
 function goToStep2() {
-    emit('update:step', 2);
+    // Etapa 2 (endereço) removida pra infoprodutos. Mantemos step=1 e a função
+    // existe só pra não quebrar nada que ainda referencia.
 }
 </script>
 
@@ -285,15 +286,7 @@ function goToStep2() {
                     </option>
                 </select>
             </div>
-            <button
-                type="button"
-                class="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white"
-                :style="{ backgroundColor: primaryColor }"
-                @click="goToStep2"
-            >
-                Continuar
-                <ChevronRight class="h-4 w-4" />
-            </button>
+            <!-- Botão interno removido — submit feito pelo botão externo do checkout (sem etapa de endereço). -->
         </div>
 
         <!-- Etapa 2: Endereço (CEP automático) -->
