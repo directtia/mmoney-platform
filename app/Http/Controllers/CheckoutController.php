@@ -501,12 +501,12 @@ class CheckoutController extends Controller
                 $rules['card_expiry_month'] = ['required_without:payment_token', 'string', 'size:2'];
                 $rules['card_expiry_year'] = ['required_without:payment_token', 'string', 'max:4'];
                 $rules['card_ccv'] = ['required_without:payment_token', 'string', 'max:4'];
-                $rules['address_zipcode'] = ['required', 'string', 'max:9'];
-                $rules['address_street'] = ['required', 'string', 'max:255'];
-                $rules['address_number'] = ['required', 'string', 'max:20'];
-                $rules['address_neighborhood'] = ['required', 'string', 'max:255'];
-                $rules['address_city'] = ['required', 'string', 'max:255'];
-                $rules['address_state'] = ['required', 'string', 'max:2'];
+                $rules['address_zipcode'] = ['nullable', 'string', 'max:9'];
+                $rules['address_street'] = ['nullable', 'string', 'max:255'];
+                $rules['address_number'] = ['nullable', 'string', 'max:20'];
+                $rules['address_neighborhood'] = ['nullable', 'string', 'max:255'];
+                $rules['address_city'] = ['nullable', 'string', 'max:255'];
+                $rules['address_state'] = ['nullable', 'string', 'max:2'];
             } elseif ($firstCardGateway === 'pagarme' || $firstCardGateway === 'efi') {
                 $rules['payment_token'] = ['required', 'string', 'max:10000'];
                 $addrRule = $skipPagarmeAddressValidation ? 'nullable' : 'required';
