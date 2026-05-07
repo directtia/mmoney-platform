@@ -40,17 +40,34 @@ class PayPalWebhookHandler
             return response()->json(['received' => true]);
         }
 
-        // Tentar extrair o order_id (referência ao Order interno) e transaction_id (orderID PayPal).
-        // PayPal envia "supplementary_data.related_ids.order_id" no evento de capture.
-        $paypalOrderId = $resource['supplementary_data']['related_ids']['order_id']
-            ?? $resource['id']
-            ?? null;
+        // Resolver o orderID PayPal original (que está no nosso DB como gateway_id).
+        // Para PAYMENT.CAPTURE.COMPLETED → vem em supplementary_data.related_ids.order_id.
+        // Para PAYMENT.CAPTURE.REFUNDED/REVERSED → resource é o refund, precisamos
+        //   extrair capture_id do link "up" e consultar o capture na API.
+        $paypalOrderId = $resource['supplementary_data']['related_ids']['order_id'] ?? null;
+
+        if (! $paypalOrderId) {
+            $captureId = null;
+            foreach (($resource['links'] ?? []) as $link) {
+                $href = (string) ($link['href'] ?? '');
+                if (($link['rel'] ?? '') === 'up' && str_contains($href, '/captures/')) {
+                    $captureId = basename($href);
+                    break;
+                }
+            }
+            if ($captureId) {
+                $paypalOrderId = $this->resolveOrderIdFromCapture($captureId);
+            }
+        }
 
         $customId = $resource['custom_id']
             ?? ($resource['purchase_units'][0]['custom_id'] ?? null);
 
         if (! is_string($paypalOrderId) || $paypalOrderId === '') {
-            Log::warning('PayPalWebhook: paypal order_id ausente', ['event_type' => $eventType]);
+            Log::warning('PayPalWebhook: paypal order_id nao resolvido', [
+                'event_type' => $eventType,
+                'resource_id' => $resource['id'] ?? null,
+            ]);
             return response()->json(['received' => true]);
         }
 
@@ -125,5 +142,46 @@ class PayPalWebhookHandler
         ProcessPaymentWebhook::dispatchSync('paypal', $paypalOrderId, $eventType, $newStatus, $event);
 
         return response()->json(['received' => true]);
+    }
+
+    /**
+     * Para webhooks de refund/reverse o resource é o refund (não tem related_ids do order original).
+     * Buscamos o capture na API PayPal pra extrair supplementary_data.related_ids.order_id.
+     * Itera sobre credenciais conectadas até achar uma que resolva (multi-tenant safe).
+     */
+    private function resolveOrderIdFromCapture(string $captureId): ?string
+    {
+        $credentials = GatewayCredential::where('gateway_slug', 'paypal')
+            ->where('is_connected', true)
+            ->get();
+
+        foreach ($credentials as $cred) {
+            try {
+                $creds = $cred->getDecryptedCredentials();
+                $client = new PayPalClient($creds);
+                $token = $client->token();
+                $base = !empty($creds['sandbox']) ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
+
+                $resp = \Illuminate\Support\Facades\Http::withToken($token)
+                    ->acceptJson()
+                    ->timeout(15)
+                    ->get($base . '/v2/payments/captures/' . $captureId);
+
+                if ($resp->successful()) {
+                    $orderId = $resp->json('supplementary_data.related_ids.order_id');
+                    if (is_string($orderId) && $orderId !== '') {
+                        return $orderId;
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::debug('PayPalWebhook: failed to resolve via tenant', [
+                    'tenant_id' => $cred->tenant_id,
+                    'capture_id' => $captureId,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return null;
     }
 }
